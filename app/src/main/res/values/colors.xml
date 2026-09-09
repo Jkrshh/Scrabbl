@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="tile_bg">#F1D9A0</color>
+    <color name="tile_text">#3B2A16</color>
+    <color name="board_bg">#F7E9CC</color>
+    <color name="dl">#3ABAD8</color>
+    <color name="tl">#2A7BBE</color>
+    <color name="dw">#E68A9C</color>
+    <color name="tw">#D0374A</color>
+    <color name="center">#FFB86B</color>
+    <color name="overlay_green">#8834C759</color>
+</resources>

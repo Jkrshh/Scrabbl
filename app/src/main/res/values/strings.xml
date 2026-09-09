@@ -1,0 +1,22 @@
+<resources>
+    <string name="app_name">Scrabbl AI</string>
+    <string name="rack_hint">Vos lettres (ex. AEINRT?)</string>
+    <string name="scan_hint">Cadrez le plateau — la détection est automatique</string>
+    <string name="tab_camera">Caméra</string>
+    <string name="tab_board">Plateau</string>
+    <string name="tab_moves">Coups</string>
+    <string name="downloading_ods">Téléchargement de l\'ODS français…</string>
+    <string name="dict_ready">Dictionnaire ODS chargé (%1$d mots)</string>
+    <string name="permission_camera_denied">Autorisation caméra refusée</string>
+    <string name="best_move">Meilleur coup : %1$s = %2$d pts</string>
+    <string name="board_size">Plateau : %1$dx%1$d</string>
+    <string name="joker">Joker</string>
+    <string name="use_joker">Joker (?)</string>
+    <string name="empty_rack">Ajoutez vos lettres pour voir des suggestions</string>
+    <string name="no_moves">Aucun coup jouable trouvé</string>
+    <string name="settings">Réglages</string>
+    <string name="board_type_classic">Classique 15x15</string>
+    <string name="board_type_super">Super 21x21</string>
+    <string name="board_type_wesh">Wesh 11x11</string>
+    <string name="board_type_deluxe">Deluxe 15x15</string>
+</resources>

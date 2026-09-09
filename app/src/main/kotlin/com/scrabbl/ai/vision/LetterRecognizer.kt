@@ -9,6 +9,7 @@ import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import com.scrabbl.ai.engine.FrenchScrabble
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
+import kotlin.math.abs
 
 /** Une lettre reconnue à un endroit précis de l'image. */
 data class RecognizedLetter(
@@ -20,14 +21,14 @@ data class RecognizedLetter(
 /**
  * OCR des lettres du plateau via ML Kit Text Recognition (Latin).
  *
- * ML Kit renvoie des « symboles » ; on garde ceux qui sont exactement
- * UN caractère alphabétique (A-Z, insensible à la casse, sans accent).
- * Chaque symbole devient une [RecognizedLetter] avec sa boîte englobante.
- *
- * On rejette :
- *   - les symboles multi-caractères (mots imprimés autour du plateau),
- *   - les caractères non-latins,
- *   - les confidences trop faibles.
+ * On accepte une lettre uniquement si :
+ *   - Son [Text.Element] parent (« mot » ML Kit) est exactement un caractère —
+ *     ça élimine les étiquettes de primes du type « 3x », « vl », « vm » qu'on
+ *     voit sur les vraies apps de Scrabble et qui polluaient énormément le
+ *     détecteur.
+ *   - Le caractère est A..Z (normalisé sans accent).
+ *   - Sa boîte est ~carrée (les tuiles le sont).
+ *   - Sa confiance est suffisante.
  */
 class LetterRecognizer {
 
@@ -46,16 +47,27 @@ class LetterRecognizer {
 
     private fun collectFromBlock(block: Text.TextBlock, out: MutableList<RecognizedLetter>) {
         for (line in block.lines) for (element in line.elements) {
-            for (symbol in element.symbols) {
-                val raw = symbol.text ?: continue
-                if (raw.length != 1) continue
-                val ch = FrenchScrabble.normalize(raw[0])
-                if (ch !in 'A'..'Z') continue
-                val box = symbol.boundingBox ?: continue
-                val conf = symbol.confidence ?: 0.5f
-                if (conf < 0.35f) continue
-                out.add(RecognizedLetter(ch, box, conf))
-            }
+            // On rejette les mots multi-caractères : ce sont des labels d'UI
+            // (« 3x », « vl », « vm », « Bag », « Score », etc.) et non des tuiles.
+            val elementText = element.text?.trim() ?: continue
+            if (elementText.length != 1) continue
+
+            val ch = FrenchScrabble.normalize(elementText[0])
+            if (ch !in 'A'..'Z') continue
+
+            val elementBox = element.boundingBox ?: continue
+            // Rejette les boîtes trop allongées (les tuiles sont carrées).
+            val w = elementBox.width().toFloat()
+            val h = elementBox.height().toFloat()
+            if (w < 8f || h < 8f) continue
+            val ratio = if (w > h) w / h else h / w
+            if (ratio > 2.2f) continue
+
+            // Utilise la confiance globale de l'élément (meilleure que celle du symbole isolé).
+            val conf = element.confidence ?: 0.5f
+            if (conf < 0.35f) continue
+
+            out.add(RecognizedLetter(ch, elementBox, conf))
         }
     }
 

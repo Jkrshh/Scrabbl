@@ -19,13 +19,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/**
- * ViewModel principal. Contient :
- *   - le plateau courant (auto-détecté via caméra ou édité à la main),
- *   - le rack de l'utilisateur,
- *   - la liste des coups classés (recalculée dès qu'un input change),
- *   - l'état du dictionnaire (chargement, téléchargement…).
- */
 class MainViewModel(
     private val dictRepo: DictionaryRepository,
 ) : ViewModel() {
@@ -47,14 +40,12 @@ class MainViewModel(
     private val _lastDetection = MutableStateFlow<BoardDetector.Detection?>(null)
     val lastDetection: StateFlow<BoardDetector.Detection?> = _lastDetection.asStateFlow()
 
-    // Verrouille le plateau après une détection stable (l'utilisateur clique « Figer »).
     private val _boardLocked = MutableStateFlow(false)
     val boardLocked: StateFlow<Boolean> = _boardLocked.asStateFlow()
 
     private var computeJob: Job? = null
 
     init {
-        // Ré-évalue les coups quand rack/board/dictionnaire changent.
         viewModelScope.launch {
             kotlinx.coroutines.flow.combine(
                 _board, _rack, dictRepo.dictionary,
@@ -101,6 +92,10 @@ class MainViewModel(
 
     fun clearBoard() {
         _board.value = Board(_board.value.type)
+    }
+
+    fun retryDictionaryDownload() {
+        dictRepo.retryDownload()
     }
 
     private fun recompute(board: Board, rackText: String, dict: Dictionary) {

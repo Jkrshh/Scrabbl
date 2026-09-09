@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,9 +14,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.GridOn
 import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -27,7 +28,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -72,7 +72,7 @@ fun MainScreen(vm: MainViewModel) {
                 .fillMaxSize()
                 .padding(padding),
         ) {
-            DictBanner(dictState)
+            DictBanner(dictState, onRetry = vm::retryDictionaryDownload)
             HorizontalDivider()
             Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                 when (tab) {
@@ -86,14 +86,20 @@ fun MainScreen(vm: MainViewModel) {
 }
 
 @Composable
-private fun DictBanner(state: DictState) {
-    val (label, showSpinner) = when (state) {
-        is DictState.Idle -> "…" to true
-        is DictState.LoadingStarter -> "Chargement dictionnaire…" to true
-        is DictState.StarterReady -> "ODS starter : ${state.words} mots — téléchargement du complet…" to true
-        is DictState.Downloading -> "Téléchargement ODS ${state.percent} %…" to true
-        is DictState.FullReady -> "Dictionnaire ODS français : ${state.words} mots" to false
-        is DictState.Failed -> "Dictionnaire de base uniquement (échec téléchargement)" to false
+private fun DictBanner(state: DictState, onRetry: () -> Unit) {
+    val (label, showSpinner, showRetry) = when (state) {
+        is DictState.Idle -> Triple("…", true, false)
+        is DictState.LoadingStarter -> Triple("Chargement dictionnaire…", true, false)
+        is DictState.StarterReady -> Triple(
+            "ODS starter : ${state.words} mots — téléchargement du complet…", true, false,
+        )
+        is DictState.Downloading -> Triple("Téléchargement ODS ${state.percent} %…", true, false)
+        is DictState.FullReady -> Triple(
+            "Dictionnaire ODS français : ${state.words} mots", false, false,
+        )
+        is DictState.Failed -> Triple(
+            "Dictionnaire de base uniquement — appuie sur ↻ pour réessayer", false, true,
+        )
     }
     Row(
         Modifier.fillMaxWidth()
@@ -105,6 +111,15 @@ private fun DictBanner(state: DictState) {
             CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.height(16.dp))
             Spacer(Modifier.padding(horizontal = 6.dp))
         }
-        Text(label, style = MaterialTheme.typography.bodySmall)
+        Text(
+            label,
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.weight(1f),
+        )
+        if (showRetry) {
+            IconButton(onClick = onRetry) {
+                Icon(Icons.Filled.Refresh, contentDescription = "Réessayer")
+            }
+        }
     }
 }

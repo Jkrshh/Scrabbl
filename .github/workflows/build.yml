@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -48,20 +48,50 @@ jobs:
       - name: Build debug APK
         run: ./gradlew assembleDebug --stacktrace --no-daemon
 
-      - name: Upload APK
+      - name: Rename APK
+        id: apk
+        run: |
+          shortsha="${GITHUB_SHA::7}"
+          src=$(ls app/build/outputs/apk/debug/*.apk | head -1)
+          dst="scrabbl-debug-${shortsha}.apk"
+          cp "$src" "$dst"
+          echo "path=$dst" >> "$GITHUB_OUTPUT"
+          echo "tag=debug-${shortsha}" >> "$GITHUB_OUTPUT"
+          echo "sha=$shortsha" >> "$GITHUB_OUTPUT"
+          ls -la "$dst"
+
+      - name: Upload APK as workflow artifact
         uses: actions/upload-artifact@v4
         with:
           name: scrabbl-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          path: ${{ steps.apk.outputs.path }}
           if-no-files-found: error
           retention-days: 30
+
+      - name: Create/refresh GitHub Release with APK
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.apk.outputs.tag }}
+          name: "Scrabbl AI debug (${{ steps.apk.outputs.sha }})"
+          body: |
+            Build automatique du commit `${{ github.sha }}`.
+
+            Installation sur Android :
+            1. Télécharge `${{ steps.apk.outputs.path }}` sur le téléphone.
+            2. Autorise les sources inconnues pour ton navigateur/gestionnaire de fichiers.
+            3. Ouvre le fichier et installe.
+
+            > APK **debug**, non signé pour Play Store — bon pour usage
+            > personnel et sideload.
+          files: ${{ steps.apk.outputs.path }}
+          prerelease: true
+          make_latest: false
+          fail_on_unmatched_files: true
 
       - name: Report APK details
         run: |
           echo "### 📦 APK build succeeded" >> $GITHUB_STEP_SUMMARY
-          for f in app/build/outputs/apk/debug/*.apk; do
-            size=$(du -h "$f" | cut -f1)
-            echo "- \`$(basename "$f")\` — $size" >> $GITHUB_STEP_SUMMARY
-          done
+          size=$(du -h "${{ steps.apk.outputs.path }}" | cut -f1)
+          echo "- \`${{ steps.apk.outputs.path }}\` — $size" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Download from the **Artifacts** section on this run's page." >> $GITHUB_STEP_SUMMARY
+          echo "**Release URL** : https://github.com/${{ github.repository }}/releases/tag/${{ steps.apk.outputs.tag }}" >> $GITHUB_STEP_SUMMARY

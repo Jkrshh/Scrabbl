@@ -74,14 +74,17 @@ class MainViewModel(
 
     fun lockBoard(lock: Boolean) { _boardLocked.value = lock }
 
-    fun setCellManual(row: Int, col: Int, letter: Char?) {
+    fun setCellManual(row: Int, col: Int, letter: Char?, isBlank: Boolean = false) {
         val b = _board.value.copy()
         if (letter == null) {
             b.letters[row][col] = 0
             b.blanks[row][col] = false
         } else {
             val ch = FrenchScrabble.normalize(letter)
-            if (ch in 'A'..'Z') b.letters[row][col] = FrenchScrabble.l(ch)
+            if (ch in 'A'..'Z') {
+                b.letters[row][col] = FrenchScrabble.l(ch)
+                b.blanks[row][col] = isBlank
+            }
         }
         _board.value = b
     }

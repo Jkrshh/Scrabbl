@@ -33,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -137,7 +138,7 @@ private fun BoardCanvas(
         for (r in 0 until n) for (c in 0 until n) {
             val x = c * tile; val y = r * tile
             val prem = board.premium[r][c]
-            val color = when (prem) {
+            val cellColor = when (prem) {
                 Premium.DL -> Color(0xFF9AD7EB)
                 Premium.TL -> Color(0xFF5D9CC9)
                 Premium.DW -> Color(0xFFEEB0BC)
@@ -145,7 +146,7 @@ private fun BoardCanvas(
                 Premium.CENTER -> Color(0xFFFFB86B)
                 else -> Color(0xFFF7E9CC)
             }
-            drawRect(color = color, topLeft = androidx.compose.ui.geometry.Offset(x, y),
+            drawRect(color = cellColor, topLeft = androidx.compose.ui.geometry.Offset(x, y),
                 size = androidx.compose.ui.geometry.Size(tile, tile))
             drawRect(color = Color(0x33000000),
                 topLeft = androidx.compose.ui.geometry.Offset(x, y),
@@ -156,21 +157,20 @@ private fun BoardCanvas(
                 drawRect(color = Color(0xFFF1D9A0),
                     topLeft = androidx.compose.ui.geometry.Offset(x + 2, y + 2),
                     size = androidx.compose.ui.geometry.Size(tile - 4, tile - 4))
-                drawContext.canvas.nativeCanvas.apply {
-                    val paint = android.graphics.Paint().apply {
-                        color = 0xFF3B2A16.toInt()
-                        textSize = tile * 0.55f
-                        textAlign = android.graphics.Paint.Align.CENTER
-                        isAntiAlias = true
-                        isFakeBoldText = true
-                    }
-                    drawText(
-                        FrenchScrabble.ch(letter).toString(),
-                        x + tile / 2f,
-                        y + tile / 2f + tile * 0.2f,
-                        paint,
-                    )
+                val nc = drawContext.canvas.nativeCanvas
+                val paint = android.graphics.Paint().apply {
+                    color = 0xFF3B2A16.toInt()
+                    textSize = tile * 0.55f
+                    textAlign = android.graphics.Paint.Align.CENTER
+                    isAntiAlias = true
+                    isFakeBoldText = true
                 }
+                nc.drawText(
+                    FrenchScrabble.ch(letter).toString(),
+                    x + tile / 2f,
+                    y + tile / 2f + tile * 0.2f,
+                    paint,
+                )
             }
             if (selected == r to c) {
                 drawRect(color = Color(0xAA34C759),

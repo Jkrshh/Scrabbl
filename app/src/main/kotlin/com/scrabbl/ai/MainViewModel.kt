@@ -101,6 +101,27 @@ class MainViewModel(
         dictRepo.retryDownload()
     }
 
+    /**
+     * Applique un coup au plateau : pose les tuiles définitivement et
+     * retire les lettres consommées du chevalet.
+     */
+    fun playMove(move: Move) {
+        val b = _board.value.copy()
+        for (p in move.placements) {
+            b.letters[p.row][p.col] = p.letter
+            b.blanks[p.row][p.col] = p.isBlank
+        }
+        _board.value = b
+
+        val remaining = _rack.value.toMutableList()
+        for (used in move.rackTilesUsed) {
+            val ch = if (used == 0) '?' else FrenchScrabble.ch(used)
+            val idx = remaining.indexOf(ch)
+            if (idx >= 0) remaining.removeAt(idx)
+        }
+        _rack.value = remaining.joinToString("")
+    }
+
     private fun recompute(board: Board, rackText: String, dict: Dictionary) {
         computeJob?.cancel()
         if (rackText.isEmpty() || dict.size == 0) {

@@ -2,6 +2,8 @@ package com.scrabbl.ai.ui
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,6 +19,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.SwapHoriz
@@ -33,12 +36,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
@@ -46,13 +51,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.scrabbl.ai.MainViewModel
+import com.scrabbl.ai.engine.Board
 import com.scrabbl.ai.engine.BoardType
+import com.scrabbl.ai.engine.Direction
 import com.scrabbl.ai.engine.FrenchScrabble
 import com.scrabbl.ai.engine.Move
 import com.scrabbl.ai.engine.Premium
 
 /**
- * Ecran principal : le plateau se remplit à la main.
+ * Ecran principal — plateau + clavier virtuel + suggestion en overlay.
  */
 @Composable
 fun BoardEditorScreen(vm: MainViewModel, onGoToMoves: () -> Unit) {
@@ -64,6 +71,8 @@ fun BoardEditorScreen(vm: MainViewModel, onGoToMoves: () -> Unit) {
     var selected by remember { mutableStateOf(board.size / 2 to board.size / 2) }
     var horizontal by remember { mutableStateOf(true) }
     var placeAsBlank by remember { mutableStateOf(false) }
+    var previewIndex by remember(moves) { mutableIntStateOf(0) }
+    val preview: Move? = moves.getOrNull(previewIndex)
 
     val scroll = rememberScrollState()
 
@@ -119,8 +128,23 @@ fun BoardEditorScreen(vm: MainViewModel, onGoToMoves: () -> Unit) {
                 board = board,
                 selected = selected,
                 horizontal = horizontal,
+                preview = preview,
                 onCell = { r, c -> selected = r to c },
             )
+        }
+
+        if (preview != null) {
+            SuggestionBar(
+                move = preview,
+                boardSize = board.size,
+                onPlay = { vm.playMove(preview) },
+            )
+        } else if (rack.isEmpty()) {
+            HintCard("Ajoute tes lettres dans le chevalet — le meilleur coup s'affichera directement sur le plateau.")
+        } else if (moves.isEmpty() && !computing) {
+            HintCard("Aucun coup jouable trouvé avec ce chevalet.")
+        } else if (computing) {
+            HintCard("Recherche en cours…")
         }
 
         Row(
@@ -164,7 +188,7 @@ fun BoardEditorScreen(vm: MainViewModel, onGoToMoves: () -> Unit) {
 
         Button(
             onClick = onGoToMoves,
-            modifier = Modifier.fillMaxWidth().height(56.dp),
+            modifier = Modifier.fillMaxWidth().height(52.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = MaterialTheme.colorScheme.primary,
             ),
@@ -172,24 +196,27 @@ fun BoardEditorScreen(vm: MainViewModel, onGoToMoves: () -> Unit) {
             Icon(Icons.Filled.Psychology, contentDescription = null)
             Spacer(Modifier.width(10.dp))
             Text(
-                if (computing) "Recherche…" else "Réfléchir 🧠",
+                if (computing) "Recherche…" else "Voir tous les coups 🧠",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
             )
         }
 
-        if (rack.isEmpty()) {
-            HintCard("Ajoute tes lettres dans le chevalet pour voir des suggestions.")
-        } else if (moves.isEmpty() && !computing) {
-            HintCard("Aucun coup jouable — vérifie le plateau, le chevalet, ou attends la fin du chargement du dictionnaire.")
-        } else {
+        if (moves.size > 1) {
             Text(
-                "Meilleurs coups (top ${moves.size.coerceAtMost(3)})",
+                "Autres coups (tape pour prévisualiser)",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
             )
-            for (m in moves.take(3)) TopMoveRow(m, board.size)
-            if (moves.size > 3) {
+            for ((i, m) in moves.take(4).withIndex()) {
+                AlternativeMoveRow(
+                    m,
+                    board.size,
+                    selected = i == previewIndex,
+                    onClick = { previewIndex = i },
+                )
+            }
+            if (moves.size > 4) {
                 OutlinedButton(onClick = onGoToMoves, modifier = Modifier.fillMaxWidth()) {
                     Text("Voir les ${moves.size} coups →")
                 }
@@ -209,14 +236,65 @@ fun BoardEditorScreen(vm: MainViewModel, onGoToMoves: () -> Unit) {
 }
 
 @Composable
-private fun TopMoveRow(m: Move, boardSize: Int) {
+private fun SuggestionBar(move: Move, boardSize: Int, onPlay: () -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = Color(0xFFFFF8EC),
-        shape = RoundedCornerShape(10.dp),
+        color = Color(0xFFDFF7DF),
+        shape = RoundedCornerShape(12.dp),
     ) {
         Row(
             Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "Meilleur coup",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color(0xFF2E7D32),
+                )
+                Text(
+                    move.word,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color(0xFF1B5E20),
+                )
+                Text(
+                    "${move.humanCoord(boardSize)} · ${if (move.direction == Direction.HORIZONTAL) "→" else "↓"} · ${move.placements.size} tuile(s) · ${move.score} pts",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFF2E7D32),
+                )
+            }
+            Button(
+                onClick = onPlay,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF34A853),
+                    contentColor = Color.White,
+                ),
+            ) {
+                Icon(Icons.Filled.Check, contentDescription = null)
+                Spacer(Modifier.width(4.dp))
+                Text("Jouer")
+            }
+        }
+    }
+}
+
+@Composable
+private fun AlternativeMoveRow(m: Move, boardSize: Int, selected: Boolean, onClick: () -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        color = if (selected) Color(0xFFDFF7DF) else Color(0xFFFFF8EC),
+        shape = RoundedCornerShape(10.dp),
+    ) {
+        Row(
+            Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                .let {
+                    if (selected) it.border(
+                        1.dp,
+                        Color(0xFF34A853),
+                        RoundedCornerShape(10.dp),
+                    ) else it
+                },
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
@@ -229,7 +307,7 @@ private fun TopMoveRow(m: Move, boardSize: Int) {
             Column(Modifier.weight(1f)) {
                 Text(m.word, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Text(
-                    "${m.humanCoord(boardSize)} · ${if (m.direction.name == "HORIZONTAL") "→" else "↓"} · ${m.placements.size} tuile(s)",
+                    "${m.humanCoord(boardSize)} · ${if (m.direction == Direction.HORIZONTAL) "→" else "↓"} · ${m.placements.size} tuile(s)",
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.DarkGray,
                 )
@@ -255,12 +333,16 @@ private fun HintCard(text: String) {
 
 @Composable
 private fun BoardCanvas(
-    board: com.scrabbl.ai.engine.Board,
+    board: Board,
     selected: Pair<Int, Int>,
     horizontal: Boolean,
+    preview: Move?,
     onCell: (Int, Int) -> Unit,
 ) {
     val n = board.size
+    val previewCells: Map<Pair<Int, Int>, Pair<Int, Boolean>> =
+        preview?.placements?.associate { (it.row to it.col) to (it.letter to it.isBlank) } ?: emptyMap()
+
     Canvas(
         modifier = Modifier
             .fillMaxWidth()
@@ -294,12 +376,11 @@ private fun BoardCanvas(
                 androidx.compose.ui.geometry.Size(tile, tile),
                 style = Stroke(width = 1f))
 
-            if (prem != Premium.NORMAL && prem != Premium.CENTER && board.letters[r][c] == 0 && tile > 24f) {
+            if (prem != Premium.NORMAL && prem != Premium.CENTER &&
+                board.letters[r][c] == 0 && !previewCells.containsKey(r to c) && tile > 24f) {
                 val label = when (prem) {
-                    Premium.DL -> "LD"
-                    Premium.TL -> "LT"
-                    Premium.DW -> "MD"
-                    Premium.TW -> "MT"
+                    Premium.DL -> "LD"; Premium.TL -> "LT"
+                    Premium.DW -> "MD"; Premium.TW -> "MT"
                     else -> ""
                 }
                 drawContext.canvas.nativeCanvas.apply {
@@ -350,6 +431,57 @@ private fun BoardCanvas(
                 }
             }
 
+            val pv = previewCells[r to c]
+            if (pv != null && letter == 0) {
+                val (pLetter, pIsBlank) = pv
+                drawRect(Color(0xCC8BE28E),
+                    androidx.compose.ui.geometry.Offset(x + 2, y + 2),
+                    androidx.compose.ui.geometry.Size(tile - 4, tile - 4))
+                drawRect(Color(0xFF1B5E20),
+                    androidx.compose.ui.geometry.Offset(x + 2, y + 2),
+                    androidx.compose.ui.geometry.Size(tile - 4, tile - 4),
+                    style = Stroke(width = 3f))
+                drawContext.canvas.nativeCanvas.apply {
+                    val paint = android.graphics.Paint().apply {
+                        color = 0xFF1B5E20.toInt()
+                        textSize = tile * 0.55f
+                        textAlign = android.graphics.Paint.Align.CENTER
+                        isAntiAlias = true
+                        isFakeBoldText = true
+                    }
+                    drawText(
+                        FrenchScrabble.ch(pLetter).toString(),
+                        x + tile / 2f,
+                        y + tile / 2f + tile * 0.2f,
+                        paint,
+                    )
+                    if (!pIsBlank && tile > 26f) {
+                        val vPaint = android.graphics.Paint().apply {
+                            color = 0xFF2E7D32.toInt()
+                            textSize = tile * 0.2f
+                            textAlign = android.graphics.Paint.Align.RIGHT
+                            isAntiAlias = true
+                        }
+                        drawText(
+                            "${FrenchScrabble.value[pLetter]}",
+                            x + tile - tile * 0.08f,
+                            y + tile - tile * 0.08f,
+                            vPaint,
+                        )
+                    }
+                    if (pIsBlank && tile > 20f) {
+                        val jPaint = android.graphics.Paint().apply {
+                            color = 0xFF1B5E20.toInt()
+                            textSize = tile * 0.18f
+                            textAlign = android.graphics.Paint.Align.LEFT
+                            isAntiAlias = true
+                            isFakeBoldText = true
+                        }
+                        drawText("★", x + tile * 0.08f, y + tile * 0.28f, jPaint)
+                    }
+                }
+            }
+
             if (selected == r to c) {
                 drawRect(Color(0xAA34C759),
                     androidx.compose.ui.geometry.Offset(x, y),
@@ -371,6 +503,22 @@ private fun BoardCanvas(
                     )
                 }
             }
+        }
+
+        if (preview != null) {
+            val startX = preview.col * tile
+            val startY = preview.row * tile
+            val endX = (preview.endCol + 1) * tile
+            val endY = (preview.endRow + 1) * tile
+            drawRect(
+                color = Color(0xFF1B5E20),
+                topLeft = androidx.compose.ui.geometry.Offset(startX + 1f, startY + 1f),
+                size = androidx.compose.ui.geometry.Size(endX - startX - 2f, endY - startY - 2f),
+                style = Stroke(
+                    width = 2.5f,
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 6f), 0f),
+                ),
+            )
         }
     }
 }

@@ -10,6 +10,7 @@ import com.scrabbl.ai.engine.Dictionary
 import com.scrabbl.ai.engine.FrenchScrabble
 import com.scrabbl.ai.engine.Move
 import com.scrabbl.ai.engine.MoveGenerator
+import com.scrabbl.ai.engine.Premium
 import com.scrabbl.ai.vision.BoardDetector
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -97,14 +98,40 @@ class MainViewModel(
         _board.value = Board(_board.value.type)
     }
 
+    /**
+     * Cycle la case (r, c) entre les 6 types de primes possibles :
+     * NORMAL -> DL -> TL -> DW -> TW -> CENTER -> NORMAL.
+     * N'affecte pas les cases occupées par une lettre.
+     */
+    fun cyclePremium(row: Int, col: Int) {
+        val b = _board.value.copy()
+        if (b.letters[row][col] != 0) return
+        val next = when (b.premium[row][col]) {
+            Premium.NORMAL -> Premium.DL
+            Premium.DL -> Premium.TL
+            Premium.TL -> Premium.DW
+            Premium.DW -> Premium.TW
+            Premium.TW -> Premium.CENTER
+            Premium.CENTER -> Premium.NORMAL
+        }
+        b.setPremium(row, col, next)
+        _board.value = b
+    }
+
+    fun resetPremiums() {
+        val current = _board.value
+        val fresh = Board(current.type)
+        for (r in 0 until current.size) for (c in 0 until current.size) {
+            fresh.letters[r][c] = current.letters[r][c]
+            fresh.blanks[r][c] = current.blanks[r][c]
+        }
+        _board.value = fresh
+    }
+
     fun retryDictionaryDownload() {
         dictRepo.retryDownload()
     }
 
-    /**
-     * Applique un coup au plateau : pose les tuiles définitivement et
-     * retire les lettres consommées du chevalet.
-     */
     fun playMove(move: Move) {
         val b = _board.value.copy()
         for (p in move.placements) {

@@ -2,14 +2,18 @@ package com.scrabbl.ai.engine
 
 /**
  * Un plateau de Scrabble.
- * `letters[r][c]`  : 0 si case vide, sinon code 1..26 (A..Z).
- * `blanks[r][c]`   : true si la lettre placée est un joker (compte 0 point).
- *
- * Les grilles de primes sont fournies par [type].
+ *   - `letters[r][c]`  : 0 si case vide, sinon code 1..26 (A..Z).
+ *   - `blanks[r][c]`   : true si la lettre placée est un joker (compte 0 point).
+ *   - `premium[r][c]`  : type de case bonus — initialisé depuis [type] mais
+ *                       éditable par l'utilisateur (chaque plateau détient son
+ *                       propre tableau, pas de partage entre instances).
  */
 class Board(val type: BoardType) {
     val size: Int = type.size
-    val premium: Array<Array<Premium>> = type.premiumGrid()
+    val premium: Array<Array<Premium>> = run {
+        val src = type.premiumGrid()
+        Array(size) { r -> Array(size) { c -> src[r][c] } }
+    }
     val letters: Array<IntArray> = Array(size) { IntArray(size) }
     val blanks: Array<BooleanArray> = Array(size) { BooleanArray(size) }
 
@@ -29,11 +33,16 @@ class Board(val type: BoardType) {
         }
     }
 
+    fun setPremium(r: Int, c: Int, p: Premium) {
+        if (inBounds(r, c)) premium[r][c] = p
+    }
+
     fun copy(): Board {
         val b = Board(type)
         for (r in 0 until size) {
             letters[r].copyInto(b.letters[r])
             blanks[r].copyInto(b.blanks[r])
+            for (c in 0 until size) b.premium[r][c] = premium[r][c]
         }
         return b
     }

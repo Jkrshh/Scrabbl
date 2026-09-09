@@ -58,9 +58,6 @@ import com.scrabbl.ai.engine.FrenchScrabble
 import com.scrabbl.ai.engine.Move
 import com.scrabbl.ai.engine.Premium
 
-/**
- * Ecran principal — plateau + clavier virtuel + suggestion en overlay.
- */
 @Composable
 fun BoardEditorScreen(vm: MainViewModel, onGoToMoves: () -> Unit) {
     val board by vm.board.collectAsState()
@@ -130,8 +127,14 @@ fun BoardEditorScreen(vm: MainViewModel, onGoToMoves: () -> Unit) {
                 horizontal = horizontal,
                 preview = preview,
                 onCell = { r, c -> selected = r to c },
+                onLongPress = { r, c -> vm.cyclePremium(r, c) },
             )
         }
+        Text(
+            "Astuce : appuie longtemps sur une case vide pour changer sa prime (LD → LT → MD → MT → centre → normale).",
+            style = MaterialTheme.typography.bodySmall,
+            color = Color(0xFF6C4B2A),
+        )
 
         if (preview != null) {
             SuggestionBar(
@@ -223,11 +226,14 @@ fun BoardEditorScreen(vm: MainViewModel, onGoToMoves: () -> Unit) {
             }
         }
 
-        Row {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = { vm.clearBoard() }) {
                 Icon(Icons.Filled.Delete, contentDescription = null)
                 Spacer(Modifier.width(6.dp))
                 Text("Vider le plateau")
+            }
+            OutlinedButton(onClick = { vm.resetPremiums() }) {
+                Text("Reset primes")
             }
         }
 
@@ -247,17 +253,8 @@ private fun SuggestionBar(move: Move, boardSize: Int, onPlay: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
-                Text(
-                    "Meilleur coup",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color(0xFF2E7D32),
-                )
-                Text(
-                    move.word,
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Color(0xFF1B5E20),
-                )
+                Text("Meilleur coup", style = MaterialTheme.typography.labelSmall, color = Color(0xFF2E7D32))
+                Text(move.word, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold, color = Color(0xFF1B5E20))
                 Text(
                     "${move.humanCoord(boardSize)} · ${if (move.direction == Direction.HORIZONTAL) "→" else "↓"} · ${move.placements.size} tuile(s) · ${move.score} pts",
                     style = MaterialTheme.typography.bodySmall,
@@ -266,10 +263,7 @@ private fun SuggestionBar(move: Move, boardSize: Int, onPlay: () -> Unit) {
             }
             Button(
                 onClick = onPlay,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF34A853),
-                    contentColor = Color.White,
-                ),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF34A853), contentColor = Color.White),
             ) {
                 Icon(Icons.Filled.Check, contentDescription = null)
                 Spacer(Modifier.width(4.dp))
@@ -288,13 +282,7 @@ private fun AlternativeMoveRow(m: Move, boardSize: Int, selected: Boolean, onCli
     ) {
         Row(
             Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
-                .let {
-                    if (selected) it.border(
-                        1.dp,
-                        Color(0xFF34A853),
-                        RoundedCornerShape(10.dp),
-                    ) else it
-                },
+                .let { if (selected) it.border(1.dp, Color(0xFF34A853), RoundedCornerShape(10.dp)) else it },
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
@@ -323,11 +311,7 @@ private fun HintCard(text: String) {
         color = Color(0xFFF7E9CC),
         shape = RoundedCornerShape(10.dp),
     ) {
-        Text(
-            text,
-            modifier = Modifier.padding(12.dp),
-            style = MaterialTheme.typography.bodyMedium,
-        )
+        Text(text, modifier = Modifier.padding(12.dp), style = MaterialTheme.typography.bodyMedium)
     }
 }
 
@@ -338,6 +322,7 @@ private fun BoardCanvas(
     horizontal: Boolean,
     preview: Move?,
     onCell: (Int, Int) -> Unit,
+    onLongPress: (Int, Int) -> Unit,
 ) {
     val n = board.size
     val previewCells: Map<Pair<Int, Int>, Pair<Int, Boolean>> =
@@ -349,12 +334,20 @@ private fun BoardCanvas(
             .aspectRatio(1f)
             .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
             .pointerInput(n) {
-                detectTapGestures { pos ->
-                    val tile = size.width / n
-                    val c = (pos.x / tile).toInt().coerceIn(0, n - 1)
-                    val r = (pos.y / tile).toInt().coerceIn(0, n - 1)
-                    onCell(r, c)
-                }
+                detectTapGestures(
+                    onTap = { pos ->
+                        val tile = size.width / n
+                        val c = (pos.x / tile).toInt().coerceIn(0, n - 1)
+                        val r = (pos.y / tile).toInt().coerceIn(0, n - 1)
+                        onCell(r, c)
+                    },
+                    onLongPress = { pos ->
+                        val tile = size.width / n
+                        val c = (pos.x / tile).toInt().coerceIn(0, n - 1)
+                        val r = (pos.y / tile).toInt().coerceIn(0, n - 1)
+                        onLongPress(r, c)
+                    },
+                )
             },
     ) {
         val tile = size.width / n

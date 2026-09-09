@@ -47,12 +47,15 @@ enum class BoardType(val size: Int, val label: String) {
 
 // ------------------------------------------------------------------
 // Layouts de primes (les grilles sont symétriques ; on les construit
-// à partir du quart supérieur-gauche).
+// à partir du quart supérieur-gauche, taille (size+1)/2).
 // ------------------------------------------------------------------
 
 private fun build(size: Int, quadrant: Array<String>): Array<Array<Premium>> {
     val half = (size + 1) / 2
     require(quadrant.size == half) { "quadrant must have $half rows (has ${quadrant.size})" }
+    require(quadrant.all { it.length == half }) {
+        "each quadrant row must be $half chars (row lengths: ${quadrant.map { it.length }})"
+    }
     val grid = Array(size) { Array(size) { Premium.NORMAL } }
     for (r in 0 until half) for (c in 0 until half) {
         val p = when (quadrant[r][c]) {
@@ -75,7 +78,7 @@ private fun build(size: Int, quadrant: Array<String>): Array<Array<Premium>> {
     return grid
 }
 
-// Layout ODS classique 15x15 (moitié 8x8 ; * au centre = Mot ×2 = premier coup).
+// Layout ODS classique 15x15 (quadrant 8x8 ; * au centre = Mot ×2 = premier coup).
 private val classic15 = build(
     15,
     arrayOf(
@@ -90,26 +93,25 @@ private val classic15 = build(
     ),
 )
 
-// Layout Super 21x21 — extension homogène du 15x15 (approximation).
+// Layout Super 21x21 — quadrant 11x11 avec * (centre) en (10,10).
 private val super21 = build(
     21,
     arrayOf(
-        "W...l....w..",
-        ".w....L.....",
-        "..w....L....",
-        "l..w....l...",
-        "....w....l..",
-        ".L...w......",
-        "..l...w...L.",
-        "L..l...w....",
-        "....l...w...",
-        ".L....l..w..",
-        "..L....l..w.",
-        "l..w....l..*",
+        "W..l...l..W",
+        ".w....L....",
+        "..w....l...",
+        "l..w....l..",
+        "....w....l.",
+        ".L...w.....",
+        "..l...w....",
+        "L..l...w...",
+        "....l...w..",
+        ".L....l..w.",
+        "W..l...l..*",
     ),
 )
 
-// Layout Wesh 11x11 (compact).
+// Layout Wesh 11x11 — quadrant 6x6.
 private val wesh11 = build(
     11,
     arrayOf(
@@ -122,7 +124,7 @@ private val wesh11 = build(
     ),
 )
 
-// Layout Junior 13x13.
+// Layout Junior 13x13 — quadrant 7x7.
 private val junior13 = build(
     13,
     arrayOf(
